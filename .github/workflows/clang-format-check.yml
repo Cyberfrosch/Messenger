@@ -1,0 +1,26 @@
+name: Clang Format Check
+
+on:
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install clang-format
+        run: sudo apt-get install -y clang-format
+
+      - name: Run clang-format on .cpp files
+        run: find . -name "*.cpp" -exec clang-format --style=file -i {} \;
+
+      - name: Run clang-format on .hpp files
+        run: find . -name "*.hpp" -exec clang-format --style=file -i {} \;
+
+      - name: Check for unformatted code
+        run: git diff --exit-code
