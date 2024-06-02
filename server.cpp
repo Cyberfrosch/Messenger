@@ -7,8 +7,7 @@ void ChatSession::Start()
     Read();
 }
 
-void ChatSession::Deliever( const std::string& msg )
-{
+void ChatSession::Deliever( const std::string& msg ) {
     bool write_in_progress = !write_msgs_.empty();
     write_msgs_.push_back( msg );
 
