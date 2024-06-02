@@ -22,6 +22,7 @@ public:
     void Deliever( const std::string& msg );
 
     static std::vector<std::shared_ptr<ChatSession>> participants_;
+
 private:
     void Read();
     void Write();
