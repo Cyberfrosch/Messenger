@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# Format and configure files
+*.vscode
+*.clang-format
