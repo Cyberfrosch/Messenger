@@ -22,8 +22,7 @@ void ChatSession::Read()
 {
     auto self( shared_from_this() );
 
-    boost::asio::async_read_until(
-        socket_, boost::asio::dynamic_buffer( buffer_ ), "\n",
+    boost::asio::async_read_until( socket_, boost::asio::dynamic_buffer( buffer_ ), "\n",
         [this, self]( boost::system::error_code ec, std::size_t length ) {
             if ( !ec )
             {
@@ -44,20 +43,20 @@ void ChatSession::Write()
     auto self( shared_from_this() );
 
     boost::asio::async_write( socket_, boost::asio::buffer( write_msgs_.front() ),
-                                [this, self]( boost::system::error_code ec, std::size_t length ) {
-                                    if ( !ec )
-                                    {
-                                        write_msgs_.pop_front();
-                                        if ( !write_msgs_.empty() )
-                                        {
-                                            Write();
-                                        }
-                                    }
-                                    else
-                                    {
-                                        socket_.close();
-                                    }
-                                } );
+        [this, self]( boost::system::error_code ec, std::size_t length ) {
+            if ( !ec )
+            {
+                write_msgs_.pop_front();
+                if ( !write_msgs_.empty() )
+                {
+                    Write();
+                }
+            }
+            else
+            {
+                socket_.close();
+            }
+        } );
 }
 
 void ChatSession::DelieverToAll( const std::string& msg )

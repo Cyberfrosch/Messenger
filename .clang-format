@@ -24,3 +24,6 @@ PointerAlignment: Left
 SortIncludes: true
 SpacesInParentheses: true
 AccessModifierOffset: -4
+ContinuationIndentWidth: 4
+IndentWrappedFunctionNames: false
+AlignAfterOpenBracket: DontAlign
