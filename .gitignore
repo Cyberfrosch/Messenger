@@ -33,4 +33,4 @@
 
 # Format and configure files
 *.vscode
-*.clang-format
+*.vs
