@@ -28,6 +28,8 @@ private:
     void Write();
     void DelieverToAll( const std::string& msg );
 
+    void TestFunc( const std::string& test ) {}
+
     tcp::socket socket_;
     std::string buffer_;
     std::deque<std::string> write_msgs_;
