@@ -1,0 +1,38 @@
+name: Formatting Check
+
+on: [push, pull_request]
+
+jobs:
+  clang-format-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install clang-format
+        run: sudo apt install -y clang-format
+
+      - name: Run clang-format on C++ header and source files
+        run: |
+          find . -name "*.cpp" -o -name "*.hpp" -o -name "*.h" -exec clang-format --style=file -i {} +
+
+      - name: Check for unformatted code
+        run: git diff --exit-code || (echo "Code is not formatted correctly. Please run clang-format." && exit 1)
+
+  editorconfig-check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install shfmt
+        run: sudo apt install -y shfmt
+
+      - name: Check bash script formatting
+        run: shfmt -d .
+
+      - name: Report unformatted files
+        if: failure()
+        run: echo "Some files are not properly formatted. Please fix the formatting issues."
