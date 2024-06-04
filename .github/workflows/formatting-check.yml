@@ -1,6 +1,14 @@
 name: Formatting Check
 
-on: [pull_request]
+on:
+  pull_request:
+    paths:
+      - '**/*.cpp'
+      - '**/*.hpp'
+      - '**/*.h'
+      - '**/*.sh'
+      - '.clang-format'
+      - '.editorconfig'
 
 jobs:
   clang-format-check:
