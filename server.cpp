@@ -27,7 +27,7 @@ void ChatSession::Read()
             if ( !ec )
             {
                 std::string msg( buffer_.substr( 0, length ) );
-                buffer_.erase( 0, length );
+                 buffer_.erase( 0, length );
                 DelieverToAll( msg );
                 Read();
             }
