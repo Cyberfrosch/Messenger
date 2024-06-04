@@ -34,3 +34,6 @@
 # Format and configure files
 *.vscode
 *.vs
+
+# Build directory
+/_result
