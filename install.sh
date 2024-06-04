@@ -27,7 +27,7 @@ while [[ $# -gt 0 ]]; do
         sudo apt install cmake -y
       fi
       # Check if Boost is installed
-      if ! command -v pkg-config &> /dev/null || ! pkg-config --exists boost; then
+      if ! find /usr/lib -name 'libboost*' &> /dev/null; then
         echo "Boost is not installed. Installing..."
         sudo apt install libboost-all-dev -y
       fi
