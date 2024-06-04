@@ -21,7 +21,14 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     -b | --build)
-      if ! find /usr/lib -name 'libboost*' &> /dev/null; then
+      # Check if CMake is installed
+      if ! command -v cmake &> /dev/null; then
+        echo "CMake is not installed. Installing..."
+        sudo apt install cmake -y
+      fi
+      # Check if Boost is installed
+      if ! command -v pkg-config &> /dev/null || ! pkg-config --exists boost; then
+        echo "Boost is not installed. Installing..."
         sudo apt install libboost-all-dev -y
       fi
       cmake -B _result
@@ -29,11 +36,11 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     -c | --clear)
-      if [[ ! -d "_result" ]]; then
-        echo "The build directory no longer exists"
-      else
+      if [[ -d "_result" ]]; then
         rm -rf _result
         echo "The build directory has been deleted"
+      else
+        echo "The build directory no longer exists"
       fi
       shift
       ;;
