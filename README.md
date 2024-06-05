@@ -10,10 +10,10 @@ Before building the project, you can optionally install the following prerequisi
 If these dependencies are not installed, they will be automatically installed using the provided `install.sh` script.
 
 ## Installation
-To install the necessary dependencies or check if they are installed, run the following command:
+To install the necessary dependencies (if they are missing) and build the project, run the following command:
 
 ```bash
-./install.sh
+./install.sh [-b/--build]
 ```
 You can also display help by running:
 
@@ -29,7 +29,7 @@ The `install.sh` script provides the following options:
 ## Usage
 To run the server, execute the following command:
 ```bash
-./build/server <port>
+./_result/server <port>
 ```
 This will start the messaging server.
 
