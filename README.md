@@ -13,7 +13,7 @@ If these dependencies are not installed, they will be automatically installed us
 To install the necessary dependencies (if they are missing) and build the project, run the following command:
 
 ```bash
-./install.sh [-b/--build]
+./install.sh --build
 ```
 You can also display help by running:
 
