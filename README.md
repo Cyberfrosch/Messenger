@@ -27,10 +27,24 @@ The `install.sh` script provides the following options:
 - `-c`, `--clear`: Remove build directory and files.
 
 ## Usage
+- ### Server
 To run the server, execute the following command:
 ```bash
 ./_result/server <port>
 ```
-This will start the messaging server.
+- **port** - On which you want to run server.
 
-Now you can connect to this port via any utility and send messages that will be delivered to all nodes in this network.
+This will start the messaging server.
+And now you can connect to this port via any utility (for example, ***client***) and send messages that will be delivered to all nodes in this network.
+
+- ### Client
+To run the client, execute the following command:
+```bash
+./_result/client <hostname> <port>
+```
+- **hostname** - The IP address or domain of the server you are connecting to.
+- **port** - On which the server is running.
+
+Now you can deliver messages to the server and other connected clients.
+
+Good luck =)
