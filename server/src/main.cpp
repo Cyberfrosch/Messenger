@@ -41,7 +41,8 @@ int main( int argc, char* argv[] )
         using namespace server;
 
         boost::asio::io_context io_context;
-        tcp::endpoint endpoint( tcp::v4(), std::atoi( argv[1] ) );
+        tcp::endpoint endpoint( tcp::v6(), std::atoi( argv[1] ) );
+
         auto server = std::make_shared<ChatServer>( io_context, endpoint );
 
         std::thread serverThread( [&io_context]() { io_context.run(); } );
