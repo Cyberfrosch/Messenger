@@ -1,21 +1,5 @@
 #include "client.hpp"
 
-namespace
-{
-
-/// @brief Функция ввода данных для отправки на сервер
-/// @param client Указатель на реализацию клиента
-void WaitForInput( std::shared_ptr<client::ChatClient> client )
-{
-    std::string msg;
-    while ( std::getline( std::cin, msg ) )
-    {
-        client->Write( msg + "\n" );
-    }
-}
-
-} // anonymous namespace
-
 int main( int argc, char* argv[] )
 {
     try
@@ -29,13 +13,32 @@ int main( int argc, char* argv[] )
         using namespace client;
 
         boost::asio::io_context io_context;
+
+        std::string host = argv[1];
+        std::string port = argv[2];
+
         tcp::resolver resolver( io_context );
-        auto endpoints = resolver.resolve( argv[1], argv[2] );
-        auto client = std::make_shared<client::ChatClient>( io_context, *endpoints.begin() );
+        auto endpoints = resolver.resolve( host, port );
+
+#ifdef DEBUG
+        for ( const auto& endpoint : endpoints )
+        {
+            std::cout << "Resolved address: " << endpoint.endpoint().address().to_string()
+                      << std::endl;
+        }
+#endif // DEBUG
+
+        auto client = std::make_shared<ChatClient>( io_context, *endpoints.begin() );
         client->Start();
 
         std::thread clientThread( [&io_context]() { io_context.run(); } );
-        std::thread inputThread( WaitForInput, client );
+        std::thread inputThread( [&client]() {
+            std::string msg;
+            while ( std::getline( std::cin, msg ) )
+            {
+                client->Write( msg + "\n" );
+            }
+        } );
 
         clientThread.join();
         client->IsConnected() ? inputThread.join() : client->Close(), inputThread.detach();
