@@ -30,7 +30,7 @@ The `install.sh` script provides the following options:
 - ### Server
 To run the server, execute the following command:
 ```bash
-./_result/server <port>
+./_result/bin/server <port>
 ```
 - **port** - On which you want to run server.
 
@@ -40,7 +40,7 @@ And now you can connect to this port via any utility (for example, ***client***)
 - ### Client
 To run the client, execute the following command:
 ```bash
-./_result/client <hostname> <port>
+./_result/bin/client <hostname> <port>
 ```
 - **hostname** - The IP address or domain of the server you are connecting to.
 - **port** - On which the server is running.
