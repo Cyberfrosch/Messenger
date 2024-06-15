@@ -101,7 +101,7 @@ ChatServer::~ChatServer()
 
 void ChatServer::AddParticipant( std::shared_ptr<ChatSession> participant )
 {
-    std::lock_guard<std::mutex> lock( mutex_ );
+    std::lock_guard lock( mutex_ );
 
     participants_.push_back( participant );
     DEBUG_PRINT( "Participant added, current size: " << participants_.size() );
@@ -109,7 +109,7 @@ void ChatServer::AddParticipant( std::shared_ptr<ChatSession> participant )
 
 void ChatServer::RemoveParticipant( std::shared_ptr<ChatSession> participant )
 {
-    std::lock_guard<std::mutex> lock( mutex_ );
+    std::lock_guard lock( mutex_ );
 
     participants_.erase( std::remove( participants_.begin(), participants_.end(), participant ),
         participants_.end() );
@@ -130,7 +130,7 @@ void ChatServer::Accept()
 
 void ChatServer::Close()
 {
-    std::lock_guard<std::mutex> lock( mutex_ );
+    std::lock_guard lock( mutex_ );
 
     if ( isClose )
     {
