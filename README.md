@@ -4,6 +4,7 @@ Implementation of a simple multi-user messenger in C++
 ## Prerequisites
 Before building the project, you can optionally install the following prerequisites:
 
+- Compiler with C++17 support
 - CMake (version 3.25.1 or higher)
 - Boost library (version 1.74.0 or higher)
 
