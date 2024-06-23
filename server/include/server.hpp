@@ -1,10 +1,11 @@
-// server.hpp
 #pragma once
 
 #ifndef _SERVER_HPP_
 #define _SERVER_HPP_
 
 #include <boost/asio.hpp>
+
+#include <pqxx/pqxx>
 
 #include <algorithm>
 #include <csignal>
@@ -28,6 +29,25 @@ namespace server
 using boost::asio::ip::tcp;
 
 class ChatServer;
+
+class AuthSession : public std::enable_shared_from_this<AuthSession>
+{
+public:
+    AuthSession( tcp::socket socket, ChatServer& server, pqxx::connection& conn );
+
+    void Start();
+
+private:
+    void Read();
+    void HandleAuthMessage( const std::string& msg );
+    void AsyncLogin( const std::string& username, const std::string& password );
+    void AsyncRegister( const std::string& username, const std::string& password );
+
+    tcp::socket socket_;
+    std::string buffer_;
+    ChatServer& server_;
+    pqxx::connection& conn_;
+};
 
 /// @brief Класс серверной сессии чата
 class ChatSession : public std::enable_shared_from_this<ChatSession>
@@ -66,7 +86,8 @@ public:
     /// @brief Конструктор серверного чата
     /// @param io_context Контекст ввода-вывода для асинхронной работы
     /// @param endpoint Конечная точка сервера (IP-адрес и порт)
-    ChatServer( boost::asio::io_context& io_context, const tcp::endpoint& endpoint );
+    ChatServer( boost::asio::io_context& io_context, const tcp::endpoint& endpoint,
+        pqxx::connection& conn );
     ~ChatServer();
 
     /// @brief Добавление участника чата
@@ -90,6 +111,7 @@ private:
     std::vector<std::shared_ptr<ChatSession>> participants_;
     std::mutex mutex_;
     bool isClose = false;
+    pqxx::connection& conn_;
 };
 
 } // namespace server

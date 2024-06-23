@@ -3,6 +3,139 @@
 namespace server
 {
 
+AuthSession::AuthSession( tcp::socket socket, ChatServer& server, pqxx::connection& conn )
+    : socket_( std::move( socket ) ), server_( server ), conn_( conn )
+{
+}
+
+void AuthSession::Start()
+{
+    Read();
+}
+
+void AuthSession::Read()
+{
+    auto self( shared_from_this() );
+
+    boost::asio::async_read_until( socket_, boost::asio::dynamic_buffer( buffer_ ), "\n",
+        [this, self]( boost::system::error_code ec, std::size_t length ) {
+            if ( !ec )
+            {
+                std::string msg( buffer_.substr( 0, length ) );
+                buffer_.erase( 0, length );
+                HandleAuthMessage( msg );
+            }
+            else
+            {
+                socket_.close();
+                std::cout << "pizdec socket zakrilsa" << std::endl;
+            }
+        } );
+}
+
+void AuthSession::HandleAuthMessage( const std::string& msg ) // register test1 test2
+{
+    std::istringstream iss( msg );
+    std::string command;
+    iss >> command;
+    std::cout << "command: " << command << std::endl;
+
+    if ( command == "register" )
+    {
+        std::string username, password;
+        iss >> username >> password;
+        std::cout << "username: " << username << std::endl;
+        std::cout << "password: " << password << std::endl;
+        AsyncRegister( username, password );
+    }
+    else if ( command == "login" )
+    {
+        std::string username, password;
+        iss >> username >> password;
+        AsyncLogin( username, password );
+    }
+    else
+    {
+        socket_.close();
+    }
+}
+
+void AuthSession::AsyncLogin( const std::string& username, const std::string& password )
+{
+    try
+    {
+        pqxx::work txn( conn_ );
+        pqxx::result res = txn.exec_prepared( "authenticate_user", username, password );
+
+        if ( res.empty() )
+        {
+            boost::asio::async_write( socket_, boost::asio::buffer( "Authentication failed\n" ),
+                [this]( boost::system::error_code ec, std::size_t /*length*/ ) {
+                    if ( !ec )
+                    {
+                        socket_.close();
+                    }
+                } );
+        }
+        else
+        {
+            boost::asio::async_write( socket_, boost::asio::buffer( "Authentication successful\n" ),
+                [this, username]( boost::system::error_code ec, std::size_t /*length*/ ) {
+                    if ( !ec )
+                    {
+                        auto chat_session =
+                            std::make_shared<ChatSession>( std::move( socket_ ), server_ );
+                        chat_session->Start();
+                    }
+                } );
+        }
+
+        txn.commit();
+    }
+    catch ( const std::exception& e )
+    {
+        boost::asio::async_write( socket_,
+            boost::asio::buffer( std::string( "Error: " ) + e.what() + "\n" ),
+            [this]( boost::system::error_code ec, std::size_t /*length*/ ) {
+                if ( !ec )
+                {
+                    socket_.close();
+                }
+            } );
+    }
+}
+
+void AuthSession::AsyncRegister( const std::string& username, const std::string& password )
+{
+    try
+    {
+        pqxx::work txn( conn_ );
+        txn.exec_prepared( "register_user", username, password );
+        txn.commit();
+
+        boost::asio::async_write( socket_, boost::asio::buffer( "Registration successful\n" ),
+            [this, username]( boost::system::error_code ec, std::size_t /*length*/ ) {
+                if ( !ec )
+                {
+                    auto chat_session =
+                        std::make_shared<ChatSession>( std::move( socket_ ), server_ );
+                    chat_session->Start();
+                }
+            } );
+    }
+    catch ( const std::exception& e )
+    {
+        boost::asio::async_write( socket_,
+            boost::asio::buffer( std::string( "Error: " ) + e.what() + "\n" ),
+            [this]( boost::system::error_code ec, std::size_t /*length*/ ) {
+                if ( !ec )
+                {
+                    socket_.close();
+                }
+            } );
+    }
+}
+
 ChatSession::ChatSession( tcp::socket socket, ChatServer& server )
     : socket_( std::move( socket ) ), server_( server )
 {
@@ -86,8 +219,9 @@ void ChatSession::Close()
     socket_.close();
 }
 
-ChatServer::ChatServer( boost::asio::io_context& io_context, const tcp::endpoint& endpoint )
-    : io_context_( io_context ), acceptor_( io_context, endpoint ), isClose( false )
+ChatServer::ChatServer(
+    boost::asio::io_context& io_context, const tcp::endpoint& endpoint, pqxx::connection& conn )
+    : io_context_( io_context ), acceptor_( io_context, endpoint ), isClose( false ), conn_( conn )
 {
     std::cout << "Server has been started" << std::endl;
     Accept();
@@ -121,8 +255,8 @@ void ChatServer::Accept()
     acceptor_.async_accept( [this]( boost::system::error_code ec, tcp::socket socket ) {
         if ( !ec )
         {
-            auto session = std::make_shared<ChatSession>( std::move( socket ), *this );
-            session->Start();
+            auto auth_session = std::make_shared<AuthSession>( std::move( socket ), *this, conn_ );
+            auth_session->Start();
         }
         Accept();
     } );
@@ -148,6 +282,7 @@ void ChatServer::Close()
     acceptor_.close();
     io_context_.stop();
     isClose = true;
+    conn_.disconnect();
 }
 
 } // namespace server

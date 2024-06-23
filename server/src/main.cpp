@@ -35,7 +35,7 @@ int main( int argc, char* argv[] )
         if ( argc != 2 )
         {
             std::cerr << "Usage: chat_server <port>" << std::endl;
-            return 1;
+            return EXIT_FAILURE;
         }
 
         using namespace server;
@@ -43,7 +43,25 @@ int main( int argc, char* argv[] )
         boost::asio::io_context io_context;
         tcp::endpoint endpoint( tcp::v6(), std::atoi( argv[1] ) );
 
-        auto server = std::make_shared<ChatServer>( io_context, endpoint );
+        const std::string connectionString = "dbname=messenger_db user=messenger "
+                                             "password=123 hostaddr=127.0.0.1 port=5432";
+
+        pqxx::connection conn( connectionString );
+        if ( conn.is_open() )
+        {
+            std::cout << "Opened database successfully: " << conn.dbname() << std::endl;
+        }
+        else
+        {
+            std::cerr << "Can't open database\n";
+            return EXIT_FAILURE;
+        }
+
+        conn.prepare(
+            "authenticate_user", "SELECT * FROM users WHERE username = $1 AND password = $2" );
+        conn.prepare( "register_user", "INSERT INTO users (username, password) VALUES ($1, $2)" );
+
+        auto server = std::make_shared<ChatServer>( io_context, endpoint, conn );
 
         std::thread serverThread( [&io_context]() { io_context.run(); } );
 
@@ -64,5 +82,5 @@ int main( int argc, char* argv[] )
         std::cerr << "Exception: " << e.what() << std::endl;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
