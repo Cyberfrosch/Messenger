@@ -77,7 +77,7 @@ void ClientConnection::Write()
 void ClientConnection::RequestSessionId()
 {
      auto self( shared_from_this() );
-     boost::asio::async_write( socket_, boost::asio::buffer( "Enter chat session ID (or 0 to create new session): " ),
+     boost::asio::async_write( socket_, boost::asio::buffer( "Enter chat session ID (or 0 to create new session):\n" ),
           [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                if ( !ec )
                {
@@ -232,8 +232,8 @@ void Server::Accept()
      acceptor_.async_accept( [this]( boost::system::error_code ec, tcp::socket socket ) {
           if ( !ec )
           {
-               auto newSession = std::make_shared<ClientConnection>( std::move( socket ), shared_from_this() );
-               newSession->Start();
+               auto newConnection = std::make_shared<ClientConnection>( std::move( socket ), shared_from_this() );
+               newConnection->Start();
           }
           Accept();
      } );
