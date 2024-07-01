@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef _CLIENT_HPP_
-#define _CLIENT_HPP_
+#ifndef CLIENT_HPP
+#define CLIENT_HPP
 
 #include <boost/asio.hpp>
 
@@ -21,39 +21,40 @@ namespace client
 {
 
 using boost::asio::ip::tcp;
+typedef std::deque<std::string> message_queue;
 
 /// @brief Класс клиента чата
 class ChatClient : public std::enable_shared_from_this<ChatClient>
 {
 public:
-    /// @brief Конструктор клиента чата
-    /// @param io_context Контекст ввода-вывода для асинхронной работы
-    /// @param endpoint Конечная точка сервера (IP-адрес и порт)
-    ChatClient( boost::asio::io_context& io_context, const tcp::endpoint& endpoint );
-    ~ChatClient();
+     /// @brief Конструктор клиента чата
+     /// @param io_context Контекст ввода-вывода для асинхронной работы
+     /// @param endpoint Конечная точка сервера (IP-адрес и порт)
+     ChatClient( boost::asio::io_context& io_context, const tcp::endpoint& endpoint );
+     ~ChatClient();
 
-    /// @brief Начинает общение с сервером
-    void Start();
+     /// @brief Начинает общение с сервером
+     void Start();
 
-    /// @brief Отправляет сообщение серверу
-    /// @param msg Сообщение для отправки
-    void Write( const std::string& msg );
+     /// @brief Отправляет сообщение серверу
+     /// @param msg Сообщение для отправки
+     void Write( const std::string& msg );
 
-    /// @brief Закрытие сокета клиента
-    void Close();
+     /// @brief Закрытие сокета клиента
+     void Close();
 
-    /// @brief Проверка состояния соединения
-    /// @return true, если сокет открыт, иначе false
-    bool IsConnected() const;
+     /// @brief Проверка состояния соединения
+     /// @return true, если сокет открыт, иначе false
+     bool IsConnected() const;
 
 private:
-    void Read();
-    void WriteImpl();
+     void Read();
+     void WriteImpl();
 
-    boost::asio::io_context& io_context_;
-    tcp::socket socket_;
-    std::string readMsg_;
-    std::deque<std::string> writeMsgs_;
+     boost::asio::io_context& io_context_;
+     tcp::socket socket_;
+     std::string readMessages_;
+     message_queue writeMessages_;
 };
 
 } // namespace client

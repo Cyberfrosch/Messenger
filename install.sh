@@ -1,5 +1,7 @@
 #!/bin/bash
 
+DEPENDENCIES_LIST=("cmake" "libboost-system-dev")
+
 display_help() {
   echo "Usage: $0 [option...] {build|clear|help}" >&2
   echo
@@ -7,6 +9,15 @@ display_help() {
   echo "   -b, --build           run CMake configure and build project"
   echo "   -c, --clear           remove build directory and files"
   echo
+}
+
+pkg_check() {
+  local pkg_name="$1"
+
+  if ! dpkg -s "${pkg_name}" &> /dev/null; then
+    echo "${pkg_name} is not installed. Installing..."
+    sudo apt install "${pkg_name}" -y
+  fi
 }
 
 if [[ "$#" -eq 0 ]]; then
@@ -21,17 +32,11 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     -b | --build)
-      # Check if CMake is installed
-      if ! command -v cmake &> /dev/null; then
-        echo "CMake is not installed. Installing..."
-        sudo apt install cmake -y
-      fi
-      # Check if Boost is installed
-      if ! find /usr/lib -name 'libboost*' &> /dev/null; then
-        echo "Boost is not installed. Installing..."
-        sudo apt install libboost-all-dev -y
-      fi
-      cmake -B _result
+      # Check if dependencies is installed
+      for pkg in "${DEPENDENCIES_LIST[@]}"; do
+        pkg_check "${pkg}"
+      done
+      cmake -DCMAKE_BUILD_TYPE:STRING=Debug -B _result
       cmake --build _result
       shift
       ;;

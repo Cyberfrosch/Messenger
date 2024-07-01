@@ -1,6 +1,6 @@
 BasedOnStyle: LLVM
-IndentWidth: 4
-TabWidth: 4
+IndentWidth: 5
+TabWidth: 5
 UseTab: Never
 BreakBeforeBraces: Custom
 BraceWrapping:
@@ -19,13 +19,13 @@ BraceWrapping:
   SplitEmptyRecord: true
   SplitEmptyNamespace: true
 AllowShortFunctionsOnASingleLine: InlineOnly
-ColumnLimit: 100
+ColumnLimit: 120
 DerivePointerAlignment: false
 PointerAlignment: Left
 SortIncludes: true
 SpacesInParentheses: true
-AccessModifierOffset: -4
-ContinuationIndentWidth: 4
+AccessModifierOffset: -5
+ContinuationIndentWidth: 5
 IndentWrappedFunctionNames: false
 AlignAfterOpenBracket: DontAlign
 IndentCaseLabels: true
