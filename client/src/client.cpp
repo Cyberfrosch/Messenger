@@ -43,7 +43,8 @@ void ChatClient::Read()
                {
                     std::string message( readMessages_.substr( 0, length ) );
                     readMessages_.erase( 0, length );
-                    std::cout << "Server: " << message;
+                    // TODO: Не отправлять сообщение создателю этого сообщения
+                    std::cout << message;
                     Read();
                }
                else if ( ec != boost::asio::error::eof )
