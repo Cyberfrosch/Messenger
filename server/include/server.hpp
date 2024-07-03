@@ -1,20 +1,19 @@
-// server.hpp
 #pragma once
 
-#ifndef _SERVER_HPP_
-#define _SERVER_HPP_
+#ifndef SERVER_HPP
+#define SERVER_HPP
 
 #include <boost/asio.hpp>
 
-#include <algorithm>
-#include <csignal>
+#include <pqxx/pqxx>
+
 #include <deque>
 #include <iostream>
+#include <list>
+#include <map>
 #include <memory>
-#include <mutex>
-#include <string>
-#include <thread>
-#include <vector>
+#include <set>
+#include <utility>
 
 #ifdef DEBUG
 #define DEBUG_PRINT( x ) std::cout << x << std::endl
@@ -26,72 +25,71 @@ namespace server
 {
 
 using boost::asio::ip::tcp;
+typedef std::deque<std::string> message_queue;
 
-class ChatServer;
+class Session;
+class Server;
 
-/// @brief Класс серверной сессии чата
-class ChatSession : public std::enable_shared_from_this<ChatSession>
+class ClientConnection : public std::enable_shared_from_this<ClientConnection>
 {
 public:
-    /// @brief Конструктор чата
-    /// @param socket Сокет для подключения
-    /// @param server Сервер, на котором запущена сессия чата
-    ChatSession( tcp::socket socket, ChatServer& server );
+     ClientConnection( tcp::socket socket, std::shared_ptr<Server> server );
 
-    /// @brief Запуск сессии чата
-    void Start();
-
-    /// @brief Отправка сообщения клиенту
-    /// @param msg Отправляемое сообщение
-    void Deliver( const std::string& msg );
-
-    /// @brief Закрытие серверной сессии чата
-    void Close();
+     void Start();
+     void Deliver( const std::string& msg );
+     void Close();
 
 private:
-    void Read();
-    void Write();
-    void DeliverToAll( const std::string& msg );
+     void Read();
+     void Write();
+     void RequestSessionId();
+     void ReadSessionId();
+     void JoinChat( int id );
 
-    tcp::socket socket_;
-    std::string buffer_;
-    std::deque<std::string> writeMsgs_;
-    ChatServer& server_;
+     tcp::socket socket_;
+     message_queue writeMessages_;
+     std::string data_;
+     std::shared_ptr<Server> server_;
+     std::shared_ptr<Session> session_;
+     boost::asio::streambuf inputBuffer_;
 };
 
-/// @brief Класс серверного чата
-class ChatServer
+class Session
 {
 public:
-    /// @brief Конструктор серверного чата
-    /// @param io_context Контекст ввода-вывода для асинхронной работы
-    /// @param endpoint Конечная точка сервера (IP-адрес и порт)
-    ChatServer( boost::asio::io_context& io_context, const tcp::endpoint& endpoint );
-    ~ChatServer();
+     Session( int id );
 
-    /// @brief Добавление участника чата
-    /// @param participant
-    void AddParticipant( std::shared_ptr<ChatSession> participant );
-
-    /// @brief Удаление участника чата
-    /// @param participant Участник чата
-    void RemoveParticipant( std::shared_ptr<ChatSession> participant );
-
-    /// @brief Закрытие сокета сервера
-    void Close();
+     void Join( std::shared_ptr<ClientConnection> clientConn );
+     void Leave( std::shared_ptr<ClientConnection> clientConn );
+     void Deliver( const std::string& msg );
+     void Close();
 
 private:
-    friend class ChatSession;
+     int id_;
+     std::set<std::shared_ptr<ClientConnection>> clientsConn_;
+     std::mutex mutex_;
+};
 
-    void Accept();
+class Server : public std::enable_shared_from_this<Server>
+{
+public:
+     Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint );
+     ~Server();
 
-    boost::asio::io_context& io_context_;
-    tcp::acceptor acceptor_;
-    std::vector<std::shared_ptr<ChatSession>> participants_;
-    std::mutex mutex_;
-    bool isClose = false;
+     std::shared_ptr<Session> GetSession( int id );
+     int CreateSession();
+     void Close();
+
+private:
+     void Accept();
+
+     boost::asio::io_context& io_context_;
+     tcp::acceptor acceptor_;
+     std::map<int, std::shared_ptr<Session>> sessions_;
+     bool isClose_;
+     std::mutex mutex_;
 };
 
 } // namespace server
 
-#endif // _SERVER_HPP_
+#endif // SERVER_HPP
