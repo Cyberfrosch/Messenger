@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEPENDENCIES_LIST=("cmake" "libboost-system-dev")
+DEPENDENCIES_LIST=("cmake" "libboost-system-dev" "pkg-config" "libpqxx-dev")
 
 display_help() {
   echo "Usage: $0 [option...] {build|clear|help}" >&2

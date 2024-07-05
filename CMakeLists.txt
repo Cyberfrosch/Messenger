@@ -29,14 +29,17 @@ if(NOT Boost_FOUND)
     message(FATAL_ERROR "Failed to find boost 1.74!")
 endif()
 
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(PQXX REQUIRED libpqxx)
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     add_compile_definitions(DEBUG)
     message(STATUS "Debug mode enabled")
 endif()
 
 add_executable(server ${SERVER_SRC})
-target_include_directories(server PUBLIC ${Boost_INCLUDE_DIR} ${SERVER_INCLUDE_DIR})
-target_link_libraries(server PUBLIC Boost::system)
+target_include_directories(server PUBLIC ${Boost_INCLUDE_DIR} ${PQXX_INCLUDE_DIRS} ${SERVER_INCLUDE_DIR})
+target_link_libraries(server PUBLIC Boost::system ${PQXX_LIBRARIES})
 set_target_properties(server PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR})
 
 add_executable(client ${CLIENT_SRC})

@@ -12,11 +12,12 @@
 #include <list>
 #include <map>
 #include <memory>
+#include <queue>
 #include <set>
 #include <utility>
 
 #ifdef DEBUG
-#define DEBUG_PRINT( x ) std::cout << x << std::endl
+#define DEBUG_PRINT( x ) std::cout << x
 #else
 #define DEBUG_PRINT( x )
 #endif
@@ -29,6 +30,32 @@ typedef std::deque<std::string> message_queue;
 
 class Session;
 class Server;
+
+class Database
+{
+public:
+     Database( const std::string& connStr, std::size_t poolSize );
+
+     pqxx::result ExecQuery( const std::string& query );
+     template <typename... Args>
+     pqxx::result ExecPreparedQuery( const std::string& stmt, Args&&... args );
+
+     void ExecUpdate( const std::string& query );
+     template <typename... Args>
+     void ExecPreparedUpdate( const std::string& stmt, Args&&... args );
+
+     void PrepareStatements( std::shared_ptr<pqxx::connection> conn );
+
+private:
+     std::shared_ptr<pqxx::connection> GetConnection();
+     void FreeConnection( std::shared_ptr<pqxx::connection> conn );
+
+     std::string connStr_;
+     std::queue<std::shared_ptr<pqxx::connection>> pool_;
+
+     std::mutex mutex_;
+     std::condition_variable condition_;
+};
 
 class ClientConnection : public std::enable_shared_from_this<ClientConnection>
 {
@@ -45,13 +72,19 @@ private:
      void RequestSessionId();
      void ReadSessionId();
      void JoinChat( int id );
+     void RequestIdentUser();
+     void ReadIdentUser();
+     void RegisterUser( const std::string& username, const std::string& password );
+     void AuthUser( const std::string& username, const std::string& password );
 
      tcp::socket socket_;
+
      message_queue writeMessages_;
      std::string data_;
+     boost::asio::streambuf inputBuffer_;
+
      std::shared_ptr<Server> server_;
      std::shared_ptr<Session> session_;
-     boost::asio::streambuf inputBuffer_;
 };
 
 class Session
@@ -67,17 +100,20 @@ public:
 private:
      int id_;
      std::set<std::shared_ptr<ClientConnection>> clientsConn_;
+
      std::mutex mutex_;
 };
 
 class Server : public std::enable_shared_from_this<Server>
 {
 public:
-     Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint );
+     Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint, const std::string& connStr,
+          std::size_t connSize );
      ~Server();
 
-     std::shared_ptr<Session> GetSession( int id );
      int CreateSession();
+     std::shared_ptr<Session> GetSession( int id );
+     std::shared_ptr<Database> GetDatabase() const;
      void Close();
 
 private:
@@ -85,7 +121,10 @@ private:
 
      boost::asio::io_context& io_context_;
      tcp::acceptor acceptor_;
+
      std::map<int, std::shared_ptr<Session>> sessions_;
+     std::shared_ptr<Database> db_;
+
      bool isClose_;
      std::mutex mutex_;
 };
