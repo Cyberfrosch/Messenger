@@ -11,17 +11,11 @@
 #include <string>
 #include <thread>
 
-#ifdef DEBUG
-#define DEBUG_PRINT( x ) std::cout << x << std::endl
-#else
-#define DEBUG_PRINT( x )
-#endif
-
+#include "common.hpp"
 namespace client
 {
 
 using boost::asio::ip::tcp;
-typedef std::deque<std::string> message_queue;
 
 /// @brief Класс клиента чата
 class ChatClient : public std::enable_shared_from_this<ChatClient>

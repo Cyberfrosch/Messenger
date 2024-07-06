@@ -37,6 +37,8 @@ while [[ $# -gt 0 ]]; do
         pkg_check "${pkg}"
       done
       cmake -DCMAKE_BUILD_TYPE:STRING=Debug -B _result
+      #-DCMAKE_BUILD_TYPE:STRING=Debug
+      #-DCMAKE_BUILD_TYPE:STRING=Release
       cmake --build _result
       shift
       ;;

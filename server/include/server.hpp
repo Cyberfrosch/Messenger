@@ -5,57 +5,22 @@
 
 #include <boost/asio.hpp>
 
-#include <pqxx/pqxx>
-
 #include <deque>
 #include <iostream>
-#include <list>
 #include <map>
 #include <memory>
-#include <queue>
+#include <mutex>
 #include <set>
-#include <utility>
 
-#ifdef DEBUG
-#define DEBUG_PRINT( x ) std::cout << x
-#else
-#define DEBUG_PRINT( x )
-#endif
-
+#include "common.hpp"
+#include "database.hpp"
 namespace server
 {
 
 using boost::asio::ip::tcp;
-typedef std::deque<std::string> message_queue;
 
 class Session;
 class Server;
-
-class Database
-{
-public:
-     Database( const std::string& connStr, std::size_t poolSize );
-
-     pqxx::result ExecQuery( const std::string& query );
-     template <typename... Args>
-     pqxx::result ExecPreparedQuery( const std::string& stmt, Args&&... args );
-
-     void ExecUpdate( const std::string& query );
-     template <typename... Args>
-     void ExecPreparedUpdate( const std::string& stmt, Args&&... args );
-
-     void PrepareStatements( std::shared_ptr<pqxx::connection> conn );
-
-private:
-     std::shared_ptr<pqxx::connection> GetConnection();
-     void FreeConnection( std::shared_ptr<pqxx::connection> conn );
-
-     std::string connStr_;
-     std::queue<std::shared_ptr<pqxx::connection>> pool_;
-
-     std::mutex mutex_;
-     std::condition_variable condition_;
-};
 
 class ClientConnection : public std::enable_shared_from_this<ClientConnection>
 {
