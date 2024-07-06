@@ -16,8 +16,8 @@ void ClientConnection::Start()
 void ClientConnection::Deliver( const std::string& msg )
 {
      bool write_in_progress = !writeMessages_.empty();
-     writeMessages_.push_back( msg + "\n" );
-     DEBUG_PRINT( "Message added to write queue: " << msg << std::endl );
+     writeMessages_.push_back( msg );
+     DEBUG_PRINT( "Message added to write queue: " << msg );
      if ( !write_in_progress )
      {
           Write();
@@ -187,7 +187,7 @@ void ClientConnection::ReadIdentUser()
                          }
                          else
                          {
-                              Deliver( "Invalid AUTH command format!" );
+                              Deliver( "Invalid AUTH command format!\n" );
                          }
                     }
                     else if ( msg.rfind( "REG", 0 ) == 0 )
@@ -200,13 +200,13 @@ void ClientConnection::ReadIdentUser()
                          }
                          else
                          {
-                              Deliver( "Invalid REG command format.\n" );
+                              Deliver( "Invalid REG command format!\n" );
                          }
                     }
                     else
                     {
                          Deliver( "You must previously sign up or sign in (use \"REG\" or \"AUTH\" "
-                                  "<username> <password>)!" );
+                                  "<username> <password>)!\n" );
                          ReadIdentUser();
                     }
                }
@@ -224,14 +224,14 @@ void ClientConnection::RegisterUser( const std::string& username, const std::str
 
      if ( !result.empty() )
      {
-          Deliver( "User already exists!" );
+          Deliver( "User already exists!\n" );
           RequestIdentUser();
           return;
      }
 
      db->ExecPreparedQuery( "register_user", username, password );
 
-     Deliver( "Registration successful" );
+     Deliver( "Registration successful\n" );
      RequestSessionId();
 }
 
@@ -242,12 +242,12 @@ void ClientConnection::AuthUser( const std::string& username, const std::string&
 
      if ( result.size() == 1 )
      {
-          Deliver( "Authentication successful" );
+          Deliver( "Authentication successful\n" );
           RequestSessionId();
      }
      else
      {
-          Deliver( "Authentication failed" );
+          Deliver( "Authentication failed!\n" );
           Close();
      }
 }
@@ -361,7 +361,7 @@ void Server::Close()
      DEBUG_PRINT( "Sessions size before close: " << sessions_.size() << std::endl );
      for ( auto& [id, session] : sessions_ )
      {
-          session->Deliver( "Server is shutting down" );
+          session->Deliver( "Server is shutting down\n" );
           session->Close();
      }
      sessions_.clear();

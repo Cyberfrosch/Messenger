@@ -17,7 +17,7 @@ ChatClient::~ChatClient()
 
 void ChatClient::Start()
 {
-     DEBUG_PRINT( "Client starts reading the messages from the server" );
+     DEBUG_PRINT( "Client starts reading the messages from the server" << std::endl );
      Read();
 }
 
@@ -89,7 +89,7 @@ void ChatClient::Close()
      }
      socket_.close();
      io_context_.stop();
-     DEBUG_PRINT( "Connection close" );
+     DEBUG_PRINT( "Connection close" << std::endl );
 }
 
 bool ChatClient::IsConnected() const
