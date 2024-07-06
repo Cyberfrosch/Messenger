@@ -6,7 +6,9 @@ Before building the project, you can optionally install the following prerequisi
 
 - Compiler with C++17 support
 - CMake (version 3.25.1 or higher)
-- Boost library (version 1.74.0 or higher)
+- libboost-system-dev (version 1.74.0 or higher)
+- pkg-config tool
+- libpqxx (version 6.4.5 or higher)
 
 If these dependencies are not installed, they will be automatically installed using the provided `install.sh` script.
 
