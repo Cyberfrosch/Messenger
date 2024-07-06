@@ -10,14 +10,14 @@ ClientConnection::ClientConnection( tcp::socket socket, std::shared_ptr<Server> 
 
 void ClientConnection::Start()
 {
-     RequestSessionId();
+     RequestIdentUser();
 }
 
 void ClientConnection::Deliver( const std::string& msg )
 {
      bool write_in_progress = !writeMessages_.empty();
-     writeMessages_.push_back( msg );
-     DEBUG_PRINT( "Message added to write queue: " << msg );
+     writeMessages_.push_back( msg + "\n" );
+     DEBUG_PRINT( "Message added to write queue: " << msg << std::endl );
      if ( !write_in_progress )
      {
           Write();
@@ -56,6 +56,7 @@ void ClientConnection::Read()
 void ClientConnection::Write()
 {
      auto self( shared_from_this() );
+
      boost::asio::async_write( socket_, boost::asio::buffer( writeMessages_.front() ),
           [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                if ( !ec )
@@ -77,6 +78,7 @@ void ClientConnection::Write()
 void ClientConnection::RequestSessionId()
 {
      auto self( shared_from_this() );
+
      boost::asio::async_write( socket_, boost::asio::buffer( "Enter chat session ID (or 0 to create new session):\n" ),
           [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                if ( !ec )
@@ -89,6 +91,7 @@ void ClientConnection::RequestSessionId()
 void ClientConnection::ReadSessionId()
 {
      auto self( shared_from_this() );
+
      boost::asio::async_read_until( socket_, inputBuffer_, '\n',
           [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                if ( !ec )
@@ -149,6 +152,106 @@ void ClientConnection::JoinChat( int id )
      }
 }
 
+void ClientConnection::RequestIdentUser()
+{
+     auto self( shared_from_this() );
+
+     boost::asio::async_write( socket_,
+          boost::asio::buffer( "Please sign up or sign in (use \"REG\" or \"AUTH\" <username> <password>):\n" ),
+          [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
+               if ( !ec )
+               {
+                    ReadIdentUser();
+               }
+          } );
+}
+
+void ClientConnection::ReadIdentUser()
+{
+     auto self( shared_from_this() );
+
+     boost::asio::async_read_until( socket_, boost::asio::dynamic_buffer( data_ ), "\n",
+          [this, self]( boost::system::error_code ec, std::size_t length ) {
+               if ( !ec )
+               {
+                    std::string msg( data_.substr( 0, length ) );
+                    data_.erase( 0, length );
+
+                    if ( msg.rfind( "AUTH", 0 ) == 0 )
+                    {
+                         std::istringstream iss( msg.substr( 5 ) );
+                         std::string username, password;
+                         if ( iss >> username >> password )
+                         {
+                              AuthUser( username, password );
+                         }
+                         else
+                         {
+                              Deliver( "Invalid AUTH command format!" );
+                         }
+                    }
+                    else if ( msg.rfind( "REG", 0 ) == 0 )
+                    {
+                         std::istringstream iss( msg.substr( 4 ) );
+                         std::string username, password;
+                         if ( iss >> username >> password )
+                         {
+                              RegisterUser( username, password );
+                         }
+                         else
+                         {
+                              Deliver( "Invalid REG command format.\n" );
+                         }
+                    }
+                    else
+                    {
+                         Deliver( "You must previously sign up or sign in (use \"REG\" or \"AUTH\" "
+                                  "<username> <password>)!" );
+                         ReadIdentUser();
+                    }
+               }
+               else
+               {
+                    socket_.close();
+               }
+          } );
+}
+
+void ClientConnection::RegisterUser( const std::string& username, const std::string& password )
+{
+     auto db = server_->GetDatabase();
+     pqxx::result result = db->ExecPreparedQuery( "authenticate_user", username, password );
+
+     if ( !result.empty() )
+     {
+          Deliver( "User already exists!" );
+          RequestIdentUser();
+          return;
+     }
+
+     db->ExecPreparedQuery( "register_user", username, password );
+
+     Deliver( "Registration successful" );
+     RequestSessionId();
+}
+
+void ClientConnection::AuthUser( const std::string& username, const std::string& password )
+{
+     auto db = server_->GetDatabase();
+     pqxx::result result = db->ExecPreparedQuery( "authenticate_user", username, password );
+
+     if ( result.size() == 1 )
+     {
+          Deliver( "Authentication successful" );
+          RequestSessionId();
+     }
+     else
+     {
+          Deliver( "Authentication failed" );
+          Close();
+     }
+}
+
 Session::Session( int id ) : id_( id )
 {
 }
@@ -188,8 +291,10 @@ void Session::Close()
      clientsConn_.clear();
 }
 
-Server::Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint )
-    : io_context_( io_context ), acceptor_( io_context, endpoint ), isClose_( false )
+Server::Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint, const std::string& connStr,
+     std::size_t connSize )
+    : io_context_( io_context ), acceptor_( io_context, endpoint ), isClose_( false ),
+      db_( std::make_shared<Database>( connStr, connSize ) )
 {
      Accept();
 }
@@ -198,6 +303,20 @@ Server::~Server()
 {
      std::cout << "Server has been closed" << std::endl;
      Close();
+}
+
+int Server::CreateSession()
+{
+     std::lock_guard lock( mutex_ );
+     int id = 1;
+
+     while ( sessions_.find( id ) != sessions_.end() )
+     {
+          id++;
+     }
+     sessions_.try_emplace( id, std::make_shared<Session>( id ) );
+
+     return id;
 }
 
 std::shared_ptr<Session> Server::GetSession( int id )
@@ -213,18 +332,9 @@ std::shared_ptr<Session> Server::GetSession( int id )
      return nullptr;
 }
 
-int Server::CreateSession()
+std::shared_ptr<Database> Server::GetDatabase() const
 {
-     std::lock_guard lock( mutex_ );
-     int id = 1;
-
-     while ( sessions_.find( id ) != sessions_.end() )
-     {
-          id++;
-     }
-     sessions_.try_emplace( id, std::make_shared<Session>( id ) );
-
-     return id;
+     return db_;
 }
 
 void Server::Accept()
@@ -248,14 +358,14 @@ void Server::Close()
 
      std::lock_guard lock( mutex_ );
 
-     DEBUG_PRINT( "Sessions size before close: " << sessions_.size() );
+     DEBUG_PRINT( "Sessions size before close: " << sessions_.size() << std::endl );
      for ( auto& [id, session] : sessions_ )
      {
-          session->Deliver( "Server is shutting down\n" );
+          session->Deliver( "Server is shutting down" );
           session->Close();
      }
      sessions_.clear();
-     DEBUG_PRINT( "Sessions size after close: " << sessions_.size() );
+     DEBUG_PRINT( "Sessions size after close: " << sessions_.size() << std::endl );
 
      acceptor_.close();
      io_context_.stop();

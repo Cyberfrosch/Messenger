@@ -5,27 +5,19 @@
 
 #include <boost/asio.hpp>
 
-#include <pqxx/pqxx>
-
 #include <deque>
 #include <iostream>
-#include <list>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <set>
-#include <utility>
 
-#ifdef DEBUG
-#define DEBUG_PRINT( x ) std::cout << x << std::endl
-#else
-#define DEBUG_PRINT( x )
-#endif
-
+#include "common.hpp"
+#include "database.hpp"
 namespace server
 {
 
 using boost::asio::ip::tcp;
-typedef std::deque<std::string> message_queue;
 
 class Session;
 class Server;
@@ -45,13 +37,19 @@ private:
      void RequestSessionId();
      void ReadSessionId();
      void JoinChat( int id );
+     void RequestIdentUser();
+     void ReadIdentUser();
+     void RegisterUser( const std::string& username, const std::string& password );
+     void AuthUser( const std::string& username, const std::string& password );
 
      tcp::socket socket_;
+
      message_queue writeMessages_;
      std::string data_;
+     boost::asio::streambuf inputBuffer_;
+
      std::shared_ptr<Server> server_;
      std::shared_ptr<Session> session_;
-     boost::asio::streambuf inputBuffer_;
 };
 
 class Session
@@ -67,17 +65,20 @@ public:
 private:
      int id_;
      std::set<std::shared_ptr<ClientConnection>> clientsConn_;
+
      std::mutex mutex_;
 };
 
 class Server : public std::enable_shared_from_this<Server>
 {
 public:
-     Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint );
+     Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint, const std::string& connStr,
+          std::size_t connSize );
      ~Server();
 
-     std::shared_ptr<Session> GetSession( int id );
      int CreateSession();
+     std::shared_ptr<Session> GetSession( int id );
+     std::shared_ptr<Database> GetDatabase() const;
      void Close();
 
 private:
@@ -85,7 +86,10 @@ private:
 
      boost::asio::io_context& io_context_;
      tcp::acceptor acceptor_;
+
      std::map<int, std::shared_ptr<Session>> sessions_;
+     std::shared_ptr<Database> db_;
+
      bool isClose_;
      std::mutex mutex_;
 };

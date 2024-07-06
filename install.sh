@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEPENDENCIES_LIST=("cmake" "libboost-system-dev")
+DEPENDENCIES_LIST=("cmake" "libboost-system-dev" "pkg-config" "libpqxx-dev")
 
 display_help() {
   echo "Usage: $0 [option...] {build|clear|help}" >&2
@@ -37,6 +37,8 @@ while [[ $# -gt 0 ]]; do
         pkg_check "${pkg}"
       done
       cmake -DCMAKE_BUILD_TYPE:STRING=Debug -B _result
+      #-DCMAKE_BUILD_TYPE:STRING=Debug
+      #-DCMAKE_BUILD_TYPE:STRING=Release
       cmake --build _result
       shift
       ;;
