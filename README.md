@@ -7,6 +7,7 @@ Before building the project, you can optionally install the following prerequisi
 - Compiler with C++17 support
 - CMake (version 3.25.1 or higher)
 - libboost-system-dev (version 1.74.0 or higher)
+- postgresql and postgresql-contrib (version 15 or higher)
 - pkg-config tool
 - libpqxx (version 6.4.5 or higher)
 
