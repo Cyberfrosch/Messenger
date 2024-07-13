@@ -28,7 +28,7 @@ std::string ToString( const T& value )
 }
 
 template <typename... Args>
-std::string ArgsToStirng( Args&&... args )
+std::string ArgsToString( Args&&... args )
 {
      std::ostringstream oss;
      ( ( oss << "\"" << ToString( args ) << "\""
@@ -39,13 +39,21 @@ std::string ArgsToStirng( Args&&... args )
 #else
 #define PrintResult( ... ) NULL
 #define ToString( ... ) NULL
-#define ArgsToStirng( ... ) NULL
+#define ArgsToString( ... ) NULL
 #endif // DEBUG
+
+namespace db_statements
+{
+
+constexpr auto authenticateUser = "authenticate_user";
+constexpr auto registerUser = "register_user";
+
+} // namespace db_statements
 
 class Database
 {
 public:
-     Database( const std::string& connStr, std::size_t poolSize );
+     Database( std::string_view connStr, const std::size_t& poolSize );
 
      pqxx::result ExecQuery( const std::string& query );
      template <typename... Args>
@@ -57,24 +65,24 @@ public:
           txn.commit();
           DEBUG_PRINT( "Read result of the prepared statement: "
                        << "\"" << stmt << "\""
-                       << " with args: " << ArgsToStirng( std::forward<Args>( args )... ) << "success" << std::endl );
+                       << " with args: " << ArgsToString( std::forward<Args>( args )... ) << "success" << std::endl );
           PrintResult( result );
           FreeConnection( conn );
 
           return result;
      }
 
-     void PrepareStatements( std::shared_ptr<pqxx::connection> conn );
+     void PrepareStatements( const std::shared_ptr<pqxx::connection>& conn ) const;
 
 private:
      std::shared_ptr<pqxx::connection> GetConnection();
-     void FreeConnection( std::shared_ptr<pqxx::connection> conn );
+     void FreeConnection( const std::shared_ptr<pqxx::connection>& conn );
 
      std::string connStr_;
      std::queue<std::shared_ptr<pqxx::connection>> pool_;
 
      std::mutex mutex_;
-     std::condition_variable condition_;
+     std::condition_variable cv_;
 };
 
 } // namespace server

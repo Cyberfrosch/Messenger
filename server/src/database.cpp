@@ -16,7 +16,7 @@ void PrintResult( const pqxx::result& result )
 
      for ( const auto& row : result )
      {
-          for ( int i = 0; i < row.size(); ++i )
+          for ( pqxx::row::size_type i = 0; i < row.size(); ++i )
           {
                const auto& field = row.at( i );
                const auto& columnName = result.column_name( i );
@@ -32,7 +32,7 @@ void PrintResult( const pqxx::result& result )
 }
 #endif
 
-Database::Database( const std::string& connStr, std::size_t poolSize ) : connStr_( connStr )
+Database::Database( std::string_view connStr, const std::size_t& poolSize ) : connStr_( connStr )
 {
      for ( std::size_t i = 0; i < poolSize; ++i )
      {
@@ -61,7 +61,7 @@ pqxx::result Database::ExecQuery( const std::string& query )
      return result;
 }
 
-void Database::PrepareStatements( std::shared_ptr<pqxx::connection> conn )
+void Database::PrepareStatements( const std::shared_ptr<pqxx::connection>& conn ) const
 {
      try
      {
@@ -69,9 +69,9 @@ void Database::PrepareStatements( std::shared_ptr<pqxx::connection> conn )
           {
                pqxx::work txn( *conn );
 
-               conn->prepare(
-                    "register_user", "INSERT INTO users (username, password) VALUES ($1::VARCHAR, $2::VARCHAR)" );
-               conn->prepare( "authenticate_user",
+               conn->prepare( db_statements::registerUser,
+                    "INSERT INTO users (username, password) VALUES ($1::VARCHAR, $2::VARCHAR)" );
+               conn->prepare( db_statements::authenticateUser,
                     "SELECT * FROM users WHERE username = $1::VARCHAR AND password = $2::VARCHAR" );
 
                txn.commit();
@@ -91,7 +91,7 @@ void Database::PrepareStatements( std::shared_ptr<pqxx::connection> conn )
 std::shared_ptr<pqxx::connection> Database::GetConnection()
 {
      std::unique_lock lock( mutex_ );
-     condition_.wait( lock, [this]() { return !pool_.empty(); } );
+     cv_.wait( lock, [this]() { return !pool_.empty(); } );
 
      auto conn = pool_.front();
      pool_.pop();
@@ -100,12 +100,12 @@ std::shared_ptr<pqxx::connection> Database::GetConnection()
      return conn;
 }
 
-void Database::FreeConnection( std::shared_ptr<pqxx::connection> conn )
+void Database::FreeConnection( const std::shared_ptr<pqxx::connection>& conn )
 {
      std::unique_lock lock( mutex_ );
 
      pool_.push( conn );
-     condition_.notify_one();
+     cv_.notify_one();
      DEBUG_PRINT( "FreeConnection() success. Size of connection pool now: " << pool_.size() << std::endl );
 }
 

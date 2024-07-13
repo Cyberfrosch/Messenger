@@ -17,7 +17,7 @@ ChatClient::~ChatClient()
 
 void ChatClient::Start()
 {
-     DEBUG_PRINT( "Client starts reading the messages from the server" );
+     DEBUG_PRINT( "Client starts reading the messages from the server" << std::endl );
      Read();
 }
 
@@ -64,7 +64,7 @@ void ChatClient::WriteImpl()
 {
      auto self( shared_from_this() );
      boost::asio::async_write( socket_, boost::asio::buffer( writeMessages_.front() ),
-          [this, self]( boost::system::error_code ec, std::size_t length ) {
+          [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                if ( !ec )
                {
                     writeMessages_.pop_front();
@@ -89,7 +89,7 @@ void ChatClient::Close()
      }
      socket_.close();
      io_context_.stop();
-     DEBUG_PRINT( "Connection close" );
+     DEBUG_PRINT( "Connection close" << std::endl );
 }
 
 bool ChatClient::IsConnected() const
