@@ -36,6 +36,8 @@ endif()
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PQXX REQUIRED libpqxx)
 
+add_compile_options(-Wall -Wextra -Werror -Wpedantic)
+
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
      add_compile_definitions(DEBUG)
      message(STATUS "Debug mode enabled")

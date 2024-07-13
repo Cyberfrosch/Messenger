@@ -48,8 +48,8 @@ int main( int argc, char* argv[] )
           boost::asio::io_context io_context;
           tcp::endpoint endpoint( tcp::v6(), std::atoi( argv[1] ) );
 
-          const std::string connStr = "dbname=messenger_db user=messenger "
-                                      "password=123 host=localhost port=5432";
+          constexpr std::string_view connStr( "dbname=messenger_db user=messenger "
+                                              "password=123 host=localhost port=5432" );
           auto server = std::make_shared<Server>( io_context, endpoint, connStr, 10 );
 
           std::thread serverThread( [&io_context]() { io_context.run(); } );

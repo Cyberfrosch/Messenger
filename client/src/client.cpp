@@ -64,7 +64,7 @@ void ChatClient::WriteImpl()
 {
      auto self( shared_from_this() );
      boost::asio::async_write( socket_, boost::asio::buffer( writeMessages_.front() ),
-          [this, self]( boost::system::error_code ec, std::size_t length ) {
+          [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                if ( !ec )
                {
                     writeMessages_.pop_front();

@@ -3,7 +3,7 @@
 namespace server
 {
 
-ClientConnection::ClientConnection( tcp::socket socket, std::shared_ptr<Server> server )
+ClientConnection::ClientConnection( tcp::socket&& socket, std::shared_ptr<Server>&& server )
     : socket_( std::move( socket ) ), server_( std::move( server ) )
 {
 }
@@ -41,7 +41,7 @@ void ClientConnection::Read()
                     DEBUG_PRINT( "Message received: " << msg );
                     if ( session_ )
                     {
-                         session_->Deliver( msg );
+                         session_.value()->Deliver( msg );
                     }
                     data_.erase( 0, length );
                     Read();
@@ -110,7 +110,7 @@ void ClientConnection::ReadSessionId()
           } );
 }
 
-void ClientConnection::JoinChat( int id )
+void ClientConnection::JoinChat( const int& id )
 {
      if ( id == 0 )
      {
@@ -118,7 +118,7 @@ void ClientConnection::JoinChat( int id )
           session_ = server_->GetSession( newSessionId );
           if ( session_ )
           {
-               session_->Join( shared_from_this() );
+               session_.value()->Join( shared_from_this() );
                auto self( shared_from_this() );
                boost::asio::async_write( socket_,
                     boost::asio::buffer( "New chat session created with ID: " + std::to_string( newSessionId ) + "\n" ),
@@ -135,7 +135,7 @@ void ClientConnection::JoinChat( int id )
           session_ = server_->GetSession( id );
           if ( session_ )
           {
-               session_->Join( shared_from_this() );
+               session_.value()->Join( shared_from_this() );
                Read();
           }
           else
@@ -220,16 +220,15 @@ void ClientConnection::ReadIdentUser()
 void ClientConnection::RegisterUser( const std::string& username, const std::string& password )
 {
      auto db = server_->GetDatabase();
-     pqxx::result result = db->ExecPreparedQuery( "authenticate_user", username, password );
+     pqxx::result result = db->ExecPreparedQuery( db_statements::authenticateUser, username, password );
 
      if ( !result.empty() )
      {
           Deliver( "User already exists!\n" );
           RequestIdentUser();
-          return;
      }
 
-     db->ExecPreparedQuery( "register_user", username, password );
+     db->ExecPreparedQuery( db_statements::registerUser, username, password );
 
      Deliver( "Registration successful\n" );
      RequestSessionId();
@@ -238,39 +237,39 @@ void ClientConnection::RegisterUser( const std::string& username, const std::str
 void ClientConnection::AuthUser( const std::string& username, const std::string& password )
 {
      auto db = server_->GetDatabase();
-     pqxx::result result = db->ExecPreparedQuery( "authenticate_user", username, password );
+     pqxx::result result = db->ExecPreparedQuery( db_statements::authenticateUser, username, password );
 
-     if ( result.size() == 1 )
+     if ( result.empty() )
+     {
+          Deliver( "Authentication failed!\n" );
+          RequestIdentUser();
+     }
+     else
      {
           Deliver( "Authentication successful\n" );
           RequestSessionId();
      }
-     else
-     {
-          Deliver( "Authentication failed!\n" );
-          Close();
-     }
 }
 
-Session::Session( int id ) : id_( id )
+Session::Session( const int& id ) : id_( id )
 {
 }
 
-void Session::Join( std::shared_ptr<ClientConnection> clientConn )
+void Session::Join( const std::shared_ptr<ClientConnection>& clientConn )
 {
      std::lock_guard lock( mutex_ );
 
      clientsConn_.insert( clientConn );
 }
 
-void Session::Leave( std::shared_ptr<ClientConnection> clientConn )
+void Session::Leave( const std::shared_ptr<ClientConnection>& clientConn )
 {
      std::lock_guard lock( mutex_ );
 
      clientsConn_.erase( clientConn );
 }
 
-void Session::Deliver( const std::string& msg )
+void Session::Deliver( const std::string& msg ) const
 {
      std::lock_guard lock( mutex_ );
 
@@ -291,10 +290,10 @@ void Session::Close()
      clientsConn_.clear();
 }
 
-Server::Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint, const std::string& connStr,
-     std::size_t connSize )
-    : io_context_( io_context ), acceptor_( io_context, endpoint ), isClose_( false ),
-      db_( std::make_shared<Database>( connStr, connSize ) )
+Server::Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint, std::string_view connStr,
+     const std::size_t& connSize )
+    : io_context_( io_context ), acceptor_( io_context, endpoint ),
+      db_( std::make_shared<Database>( connStr, connSize ) ), isClose_( false )
 {
      Accept();
 }
@@ -319,7 +318,7 @@ int Server::CreateSession()
      return id;
 }
 
-std::shared_ptr<Session> Server::GetSession( int id )
+std::optional<std::shared_ptr<Session>> Server::GetSession( const int& id ) const
 {
      std::lock_guard lock( mutex_ );
 
@@ -329,7 +328,7 @@ std::shared_ptr<Session> Server::GetSession( int id )
           return it->second;
      }
 
-     return nullptr;
+     return std::nullopt;
 }
 
 std::shared_ptr<Database> Server::GetDatabase() const
@@ -342,7 +341,8 @@ void Server::Accept()
      acceptor_.async_accept( [this]( boost::system::error_code ec, tcp::socket socket ) {
           if ( !ec )
           {
-               auto newConnection = std::make_shared<ClientConnection>( std::move( socket ), shared_from_this() );
+               auto newConnection =
+                    std::make_shared<ClientConnection>( std::move( socket ), std::move( shared_from_this() ) );
                newConnection->Start();
           }
           Accept();
