@@ -52,6 +52,7 @@ private:
 
      std::shared_ptr<Server> server_;
      std::optional<std::shared_ptr<Session>> session_;
+     std::string username_;
 };
 
 class Session

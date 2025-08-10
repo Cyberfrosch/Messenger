@@ -61,7 +61,10 @@ public:
      {
           auto conn = GetConnection();
           pqxx::work txn( *conn );
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
           pqxx::result result = txn.exec_prepared( stmt, std::forward<Args>( args )... );
+#pragma GCC diagnostic pop
           txn.commit();
           DEBUG_PRINT( "Read result of the prepared statement: "
                        << "\"" << stmt << "\""

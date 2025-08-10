@@ -1,4 +1,5 @@
 #include "server.hpp"
+#include <cstdlib>
 
 namespace
 {
@@ -17,6 +18,11 @@ void SignalHandler( int signal )
                DEBUG_PRINT( "SIGQUIT received" << std::endl );
                break;
           }
+          case SIGTERM:
+          {
+               DEBUG_PRINT( "SIGTERM received" << std::endl );
+               break;
+          }
           default:
           {
                break;
@@ -32,9 +38,12 @@ int main( int argc, char* argv[] )
 {
      try
      {
-          if ( std::signal( SIGINT, SignalHandler ) == SIG_ERR || std::signal( SIGQUIT, SignalHandler ) == SIG_ERR )
+          if ( std::signal( SIGINT, SignalHandler ) == SIG_ERR ||
+               std::signal( SIGQUIT, SignalHandler ) == SIG_ERR ||
+               std::signal( SIGTERM, SignalHandler ) == SIG_ERR )
           {
                std::cerr << "Cannot set signal handler" << std::endl;
+               return EXIT_FAILURE;
           }
 
           if ( argc != 2 )
@@ -48,8 +57,9 @@ int main( int argc, char* argv[] )
           boost::asio::io_context io_context;
           tcp::endpoint endpoint( tcp::v6(), std::atoi( argv[1] ) );
 
-          constexpr std::string_view connStr( "dbname=messenger_db user=messenger "
-                                              "password=123 host=localhost port=5432" );
+          const char* envConnStr = std::getenv("DB_CONNECTION_STRING");
+          const std::string connStr = envConnStr ? envConnStr :
+               "dbname=messenger_db user=messenger password=123 host=localhost port=5432";
           auto server = std::make_shared<Server>( io_context, endpoint, connStr, 10 );
 
           std::thread serverThread( [&io_context]() { io_context.run(); } );

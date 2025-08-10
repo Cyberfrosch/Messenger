@@ -16,7 +16,9 @@ void ClientConnection::Start()
 void ClientConnection::Deliver( const std::string& msg )
 {
      bool write_in_progress = !writeMessages_.empty();
-     writeMessages_.push_back( msg );
+     // ANSI escape sequences to preserve input line
+     std::string formattedMsg = "\r\033[K" + msg + "\033[s\033[u";
+     writeMessages_.push_back( formattedMsg );
      DEBUG_PRINT( "Message added to write queue: " << msg );
      if ( !write_in_progress )
      {
@@ -41,7 +43,8 @@ void ClientConnection::Read()
                     DEBUG_PRINT( "Message received: " << msg );
                     if ( session_ )
                     {
-                         session_.value()->Deliver( msg );
+                         std::string formattedMsg = username_ + ": " + msg;
+                         session_.value()->Deliver( formattedMsg );
                     }
                     data_.erase( 0, length );
                     Read();
@@ -230,6 +233,7 @@ void ClientConnection::RegisterUser( const std::string& username, const std::str
 
      db->ExecPreparedQuery( db_statements::registerUser, username, password );
 
+     username_ = username;
      Deliver( "Registration successful\n" );
      RequestSessionId();
 }
@@ -246,6 +250,7 @@ void ClientConnection::AuthUser( const std::string& username, const std::string&
      }
      else
      {
+          username_ = username;
           Deliver( "Authentication successful\n" );
           RequestSessionId();
      }
