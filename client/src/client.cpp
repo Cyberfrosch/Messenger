@@ -1,5 +1,8 @@
 #include "client.hpp"
 
+#include <format>
+#include <print>
+
 namespace client
 {
 
@@ -7,7 +10,7 @@ ChatClient::ChatClient( boost::asio::io_context& io_context, const tcp::endpoint
     : io_context_( io_context ), socket_( io_context )
 {
      socket_.connect( endpoint );
-     std::cout << "The connection was successful" << std::endl;
+     std::println( "The connection was successful" );
 }
 
 ChatClient::~ChatClient()
@@ -17,16 +20,16 @@ ChatClient::~ChatClient()
 
 void ChatClient::Start()
 {
-     DEBUG_PRINT( "Client starts reading the messages from the server" << std::endl );
+     common::DebugPrint( "Client starts reading the messages from the server" );
      Read();
 }
 
-void ChatClient::Write( const std::string& msg )
+void ChatClient::Write( std::string_view msg )
 {
      auto self( shared_from_this() );
-     boost::asio::post( socket_.get_executor(), [this, self, msg]() {
+     boost::asio::post( socket_.get_executor(), [this, self, msg = std::string( msg )]() {
           bool write_in_progress = !writeMessages_.empty();
-          writeMessages_.push_back( msg + "\n" );
+          writeMessages_.push_back( std::move( msg ) + "\n" );
           if ( !write_in_progress )
           {
                WriteImpl();
@@ -43,18 +46,17 @@ void ChatClient::Read()
                {
                     std::string message( readMessages_.substr( 0, length ) );
                     readMessages_.erase( 0, length );
-                    // TODO: Не отправлять сообщение создателю этого сообщения
-                    std::cout << message;
+                    std::print( "{}", message );
                     Read();
                }
                else if ( ec != boost::asio::error::eof )
                {
-                    std::cerr << "Error in reading: " << ec.message() << std::endl;
+                    std::println( stderr, "Error while reading: {}", ec.message() );
                     socket_.close();
                }
                else
                {
-                    std::cerr << "Server disconnected." << std::endl;
+                    std::println( stderr, "Server disconnected" );
                     this->Close();
                }
           } );
@@ -75,7 +77,7 @@ void ChatClient::WriteImpl()
                }
                else
                {
-                    std::cerr << "Error in writing: " << ec.message() << std::endl;
+                    std::println( stderr, "Error while writing: {}", ec.message() );
                     socket_.close();
                }
           } );
@@ -84,17 +86,11 @@ void ChatClient::WriteImpl()
 void ChatClient::Close()
 {
      if ( !socket_.is_open() )
-     {
           return;
-     }
+
      socket_.close();
      io_context_.stop();
-     DEBUG_PRINT( "Connection close" << std::endl );
-}
-
-bool ChatClient::IsConnected() const
-{
-     return socket_.is_open();
+     common::DebugPrint( "Connection closed\n" );
 }
 
 } // namespace client

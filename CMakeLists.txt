@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25.1)
 
 project(Messenger)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(BIN_DIR ${CMAKE_BINARY_DIR}/bin)
@@ -50,7 +50,7 @@ target_include_directories(server PUBLIC
      ${COMMON_INCLUDE_DIR}
      ${SERVER_INCLUDE_DIR})
 
-target_link_libraries(server PUBLIC Boost::system ${PQXX_LIBRARIES})
+target_link_libraries(server PUBLIC Boost::system ${PQXX_LIBRARIES} -lstdc++exp)
 set_target_properties(server PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR})
 
 add_executable(client ${CLIENT_SRC})
@@ -59,5 +59,5 @@ target_include_directories(client PUBLIC
      ${COMMON_INCLUDE_DIR}
      ${CLIENT_INCLUDE_DIR})
 
-target_link_libraries(client PUBLIC Boost::system)
+target_link_libraries(client PUBLIC Boost::system -lstdc++exp)
 set_target_properties(client PROPERTIES RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR})

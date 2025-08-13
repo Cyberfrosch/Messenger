@@ -1,17 +1,29 @@
 #pragma once
 
-#ifndef COMMON_HPP
-#define COMMON_HPP
-
 #include <deque>
 #include <iostream>
+#include <print>
+#include <string>
 
+namespace common
+{
+
+inline constexpr bool isDebug =
 #ifdef DEBUG
-#define DEBUG_PRINT( x ) std::cout << x
+     true;
 #else
-#define DEBUG_PRINT( x )
+     false;
 #endif
+
+template <typename... Args>
+inline void DebugPrint( std::format_string<Args...> fmt, Args&&... args )
+{
+     if constexpr ( isDebug )
+     {
+          std::print( fmt, std::forward<Args>( args )... );
+     }
+}
 
 using message_queue = std::deque<std::string>;
 
-#endif // COMMON_HPP
+}

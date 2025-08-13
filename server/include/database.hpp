@@ -1,93 +1,102 @@
 #pragma once
 
-#ifndef DATABASE_HPP
-#define DATABASE_HPP
-
-#include <pqxx/pqxx>
-
 #include <condition_variable>
-#include <iostream>
+#include <format>
 #include <memory>
 #include <mutex>
 #include <queue>
+#include <string>
+#include <string_view>
+#include <ranges>
 
 #include "common.hpp"
+
+#include <pqxx/pqxx>
 
 namespace server
 {
 
-#ifdef DEBUG
-void PrintResult( const pqxx::result& result );
-
-template <typename T>
-std::string ToString( const T& value )
+inline void PrintResult( const pqxx::result& result )
 {
-     std::ostringstream oss;
-     oss << value;
-     return oss.str();
+     if constexpr ( common::isDebug )
+     {
+          if ( result.empty() )
+          {
+               common::DebugPrint( "Query result is empty\n" );
+               return;
+          }
+          for ( const auto& row : result )
+          {
+               for ( pqxx::row::size_type i = 0; i < row.size(); ++i )
+               {
+                    common::DebugPrint( "{}:{} ", result.column_name( i ), row[i].c_str() );
+               }
+               common::DebugPrint( "\n" );
+          }
+     }
 }
-
-template <typename... Args>
-std::string ArgsToString( Args&&... args )
-{
-     std::ostringstream oss;
-     ( ( oss << "\"" << ToString( args ) << "\""
-             << " " ),
-          ... );
-     return oss.str();
-}
-#else
-#define PrintResult( ... ) NULL
-#define ToString( ... ) NULL
-#define ArgsToString( ... ) NULL
-#endif // DEBUG
 
 namespace db_statements
 {
 
-constexpr auto authenticateUser = "authenticate_user";
-constexpr auto registerUser = "register_user";
+inline constexpr std::string_view authenticateUser = "authenticate_user";
+inline constexpr std::string_view registerUser = "register_user";
 
 } // namespace db_statements
 
 class Database
 {
 public:
-     Database( std::string_view connStr, const std::size_t& poolSize );
+     Database( std::string_view connStr, const std::size_t poolSize );
 
-     pqxx::result ExecQuery( const std::string& query );
+     pqxx::result ExecQuery( std::string_view query );
+     void PrepareStatements( const std::shared_ptr<pqxx::connection>& conn ) const;
+
+public:
      template <typename... Args>
-     pqxx::result ExecPreparedQuery( const std::string& stmt, Args&&... args )
+     pqxx::result ExecPreparedQuery( std::string_view stmt, Args&&... args )
      {
           auto conn = GetConnection();
           pqxx::work txn( *conn );
+          // TODO: Исправить вызов подготовленного запроса с передачей fold-expression
+          // pqxx::result result = txn.exec( stmt, pqxx::params{ std::forward<Args>( args )... } );
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
-          pqxx::result result = txn.exec_prepared( stmt, std::forward<Args>( args )... );
+          pqxx::result result = txn.exec_prepared( std::string( stmt ), std::forward<Args>( args )... );
 #pragma GCC diagnostic pop
           txn.commit();
-          DEBUG_PRINT( "Read result of the prepared statement: "
-                       << "\"" << stmt << "\""
-                       << " with args: " << ArgsToString( std::forward<Args>( args )... ) << "success" << std::endl );
+
+          if constexpr ( common::isDebug )
+          {
+               std::ostringstream oss;
+               bool first = true;
+
+               auto append_arg = [&]( auto&& arg ) {
+                    if ( !first )
+                         oss << ", ";
+                    first = false;
+                    oss << arg;
+               };
+
+               ( append_arg( std::forward<Args>( args ) ), ... );
+
+               common::DebugPrint( "Prepared statement \"{}\" executed with args: [{}] success\n", stmt, oss.str() );
+          }
+
           PrintResult( result );
           FreeConnection( conn );
-
           return result;
      }
-
-     void PrepareStatements( const std::shared_ptr<pqxx::connection>& conn ) const;
 
 private:
      std::shared_ptr<pqxx::connection> GetConnection();
      void FreeConnection( const std::shared_ptr<pqxx::connection>& conn );
 
+private:
      std::string connStr_;
      std::queue<std::shared_ptr<pqxx::connection>> pool_;
-
      std::mutex mutex_;
      std::condition_variable cv_;
 };
 
 } // namespace server
-
-#endif // DATABASE_HPP
