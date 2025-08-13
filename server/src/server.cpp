@@ -1,10 +1,14 @@
 #include "server.hpp"
 
+#include <format>
+#include <utility>
+
 namespace server
 {
 
-ClientConnection::ClientConnection( tcp::socket socket, std::shared_ptr<Server> server )
-    : socket_( std::move( socket ) ), server_( std::move( server ) )
+ClientConnection::ClientConnection( tcp::socket&& socket, std::shared_ptr<Server>&& server )
+: socket_( std::move( socket ) ),
+server_( std::move( server ) )
 {
 }
 
@@ -13,11 +17,13 @@ void ClientConnection::Start()
      RequestIdentUser();
 }
 
-void ClientConnection::Deliver( const std::string& msg )
+void ClientConnection::Deliver( std::string_view msg )
 {
      bool write_in_progress = !writeMessages_.empty();
-     writeMessages_.push_back( msg + "\n" );
-     DEBUG_PRINT( "Message added to write queue: " << msg << std::endl );
+     // ANSI escape sequences to preserve input line
+     std::string formattedMsg = std::format( "\r\033[K{}\033[s\033[u", msg );
+     writeMessages_.push_back( std::move( formattedMsg ) );
+     common::DebugPrint( "Message added to write queue: {}", msg );
      if ( !write_in_progress )
      {
           Write();
@@ -38,10 +44,11 @@ void ClientConnection::Read()
                if ( !ec )
                {
                     std::string msg( data_.substr( 0, length ) );
-                    DEBUG_PRINT( "Message received: " << msg );
+                    common::DebugPrint( "Message received: {}", msg );
                     if ( session_ )
                     {
-                         session_->Deliver( msg );
+                         std::string formattedMsg = std::format( "{}: {}", username_, msg );
+                         session_.value()->Deliver( formattedMsg );
                     }
                     data_.erase( 0, length );
                     Read();
@@ -61,7 +68,7 @@ void ClientConnection::Write()
           [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                if ( !ec )
                {
-                    DEBUG_PRINT( "Message sent: " << writeMessages_.front() );
+                    common::DebugPrint( "Message sent: {}", writeMessages_.front() );
                     writeMessages_.pop_front();
                     if ( !writeMessages_.empty() )
                     {
@@ -110,7 +117,7 @@ void ClientConnection::ReadSessionId()
           } );
 }
 
-void ClientConnection::JoinChat( int id )
+void ClientConnection::JoinChat( const int id )
 {
      if ( id == 0 )
      {
@@ -118,10 +125,10 @@ void ClientConnection::JoinChat( int id )
           session_ = server_->GetSession( newSessionId );
           if ( session_ )
           {
-               session_->Join( shared_from_this() );
+               session_.value()->Join( shared_from_this() );
                auto self( shared_from_this() );
                boost::asio::async_write( socket_,
-                    boost::asio::buffer( "New chat session created with ID: " + std::to_string( newSessionId ) + "\n" ),
+                    boost::asio::buffer( std::format( "New chat session created with ID: {}\n", newSessionId ) ),
                     [this, self]( boost::system::error_code ec, [[maybe_unused]] std::size_t length ) {
                          if ( !ec )
                          {
@@ -135,7 +142,7 @@ void ClientConnection::JoinChat( int id )
           session_ = server_->GetSession( id );
           if ( session_ )
           {
-               session_->Join( shared_from_this() );
+               session_.value()->Join( shared_from_this() );
                Read();
           }
           else
@@ -177,7 +184,7 @@ void ClientConnection::ReadIdentUser()
                     std::string msg( data_.substr( 0, length ) );
                     data_.erase( 0, length );
 
-                    if ( msg.rfind( "AUTH", 0 ) == 0 )
+                    if ( msg.starts_with( "AUTH" ) )
                     {
                          std::istringstream iss( msg.substr( 5 ) );
                          std::string username, password;
@@ -187,10 +194,10 @@ void ClientConnection::ReadIdentUser()
                          }
                          else
                          {
-                              Deliver( "Invalid AUTH command format!" );
+                              Deliver( "Invalid AUTH command format!\n" );
                          }
                     }
-                    else if ( msg.rfind( "REG", 0 ) == 0 )
+                    else if ( msg.starts_with( "REG" ) )
                     {
                          std::istringstream iss( msg.substr( 4 ) );
                          std::string username, password;
@@ -200,13 +207,13 @@ void ClientConnection::ReadIdentUser()
                          }
                          else
                          {
-                              Deliver( "Invalid REG command format.\n" );
+                              Deliver( "Invalid REG command format!\n" );
                          }
                     }
                     else
                     {
                          Deliver( "You must previously sign up or sign in (use \"REG\" or \"AUTH\" "
-                                  "<username> <password>)!" );
+                                  "<username> <password>)!\n" );
                          ReadIdentUser();
                     }
                }
@@ -217,60 +224,62 @@ void ClientConnection::ReadIdentUser()
           } );
 }
 
-void ClientConnection::RegisterUser( const std::string& username, const std::string& password )
+void ClientConnection::RegisterUser( std::string_view username, std::string_view password )
 {
      auto db = server_->GetDatabase();
-     pqxx::result result = db->ExecPreparedQuery( "authenticate_user", username, password );
+     pqxx::result result = db->ExecPreparedQuery( db_statements::authenticateUser, username, password );
 
      if ( !result.empty() )
      {
-          Deliver( "User already exists!" );
+          Deliver( "User already exists!\n" );
           RequestIdentUser();
-          return;
      }
 
-     db->ExecPreparedQuery( "register_user", username, password );
+     db->ExecPreparedQuery( db_statements::registerUser, username, password );
 
-     Deliver( "Registration successful" );
+     username_ = std::string( username );
+     Deliver( "Registration successful\n" );
      RequestSessionId();
 }
 
-void ClientConnection::AuthUser( const std::string& username, const std::string& password )
+void ClientConnection::AuthUser( std::string_view username, std::string_view password )
 {
      auto db = server_->GetDatabase();
-     pqxx::result result = db->ExecPreparedQuery( "authenticate_user", username, password );
+     pqxx::result result = db->ExecPreparedQuery( db_statements::authenticateUser, username, password );
 
-     if ( result.size() == 1 )
+     if ( result.empty() )
      {
-          Deliver( "Authentication successful" );
-          RequestSessionId();
+          Deliver( "Authentication failed!\n" );
+          RequestIdentUser();
      }
      else
      {
-          Deliver( "Authentication failed" );
-          Close();
+          username_ = std::string( username );
+          Deliver( "Authentication successful\n" );
+          RequestSessionId();
      }
 }
 
-Session::Session( int id ) : id_( id )
+Session::Session( int id )
+: id_( id )
 {
 }
 
-void Session::Join( std::shared_ptr<ClientConnection> clientConn )
+void Session::Join( const std::shared_ptr<ClientConnection>& clientConn )
 {
      std::lock_guard lock( mutex_ );
 
      clientsConn_.insert( clientConn );
 }
 
-void Session::Leave( std::shared_ptr<ClientConnection> clientConn )
+void Session::Leave( const std::shared_ptr<ClientConnection>& clientConn )
 {
      std::lock_guard lock( mutex_ );
 
      clientsConn_.erase( clientConn );
 }
 
-void Session::Deliver( const std::string& msg )
+void Session::Deliver( std::string_view msg ) const
 {
      std::lock_guard lock( mutex_ );
 
@@ -291,17 +300,19 @@ void Session::Close()
      clientsConn_.clear();
 }
 
-Server::Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint, const std::string& connStr,
-     std::size_t connSize )
-    : io_context_( io_context ), acceptor_( io_context, endpoint ), isClose_( false ),
-      db_( std::make_shared<Database>( connStr, connSize ) )
+Server::Server( boost::asio::io_context& io_context, const tcp::endpoint& endpoint, std::string_view connStr,
+     const std::size_t connSize )
+: io_context_( io_context ),
+acceptor_( io_context, endpoint ),
+db_( std::make_shared<Database>( connStr, connSize ) ),
+isClose_( false )
 {
      Accept();
 }
 
 Server::~Server()
 {
-     std::cout << "Server has been closed" << std::endl;
+     std::println( "Server has been closed" );
      Close();
 }
 
@@ -310,7 +321,7 @@ int Server::CreateSession()
      std::lock_guard lock( mutex_ );
      int id = 1;
 
-     while ( sessions_.find( id ) != sessions_.end() )
+     while ( sessions_.contains( id ) )
      {
           id++;
      }
@@ -319,7 +330,7 @@ int Server::CreateSession()
      return id;
 }
 
-std::shared_ptr<Session> Server::GetSession( int id )
+std::optional<std::shared_ptr<Session>> Server::GetSession( const int id ) const
 {
      std::lock_guard lock( mutex_ );
 
@@ -329,7 +340,7 @@ std::shared_ptr<Session> Server::GetSession( int id )
           return it->second;
      }
 
-     return nullptr;
+     return std::nullopt;
 }
 
 std::shared_ptr<Database> Server::GetDatabase() const
@@ -339,33 +350,37 @@ std::shared_ptr<Database> Server::GetDatabase() const
 
 void Server::Accept()
 {
+     if ( isClose_ )
+          return;
+
      acceptor_.async_accept( [this]( boost::system::error_code ec, tcp::socket socket ) {
           if ( !ec )
           {
-               auto newConnection = std::make_shared<ClientConnection>( std::move( socket ), shared_from_this() );
+               auto newConnection =
+                    std::make_shared<ClientConnection>( std::move( socket ), std::move( shared_from_this() ) );
                newConnection->Start();
           }
-          Accept();
+
+          if ( !isClose_ )
+               Accept();
      } );
 }
 
 void Server::Close()
 {
      if ( isClose_ )
-     {
           return;
-     }
 
      std::lock_guard lock( mutex_ );
 
-     DEBUG_PRINT( "Sessions size before close: " << sessions_.size() << std::endl );
+     common::DebugPrint( "Sessions size before close: {}\n", sessions_.size() );
      for ( auto& [id, session] : sessions_ )
      {
-          session->Deliver( "Server is shutting down" );
+          session->Deliver( "Server is shutting down\n" );
           session->Close();
      }
      sessions_.clear();
-     DEBUG_PRINT( "Sessions size after close: " << sessions_.size() << std::endl );
+     common::DebugPrint( "Sessions size after close: {}\n", sessions_.size() );
 
      acceptor_.close();
      io_context_.stop();

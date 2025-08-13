@@ -1,12 +1,16 @@
 #include "client.hpp"
 
+#include <cstdlib>
+#include <print>
+#include <stacktrace>
+
 int main( int argc, char* argv[] )
 {
      try
      {
           if ( argc != 3 )
           {
-               std::cerr << "Usage: chat_client <host> <port>" << std::endl;
+               std::println( stderr, "Usage: chat_client <host> <port>" );
                return EXIT_FAILURE;
           }
 
@@ -20,31 +24,41 @@ int main( int argc, char* argv[] )
           tcp::resolver resolver( io_context );
           auto endpoints = resolver.resolve( host, port );
 
-#ifdef DEBUG
-          for ( const auto& endpoint : endpoints )
+          if constexpr ( common::isDebug )
           {
-               std::cout << "Resolved address: " << endpoint.endpoint().address().to_string() << std::endl;
+               for ( const auto& endpoint : endpoints )
+               {
+                    std::println( "Resolved address: {}", endpoint.endpoint().address().to_string() );
+               }
           }
-#endif // DEBUG
 
           auto client = std::make_shared<ChatClient>( io_context, *endpoints.begin() );
           client->Start();
 
-          std::thread clientThread( [&io_context]() { io_context.run(); } );
-          std::thread inputThread( [&client]() {
+          std::jthread clientThread( [&io_context]() {
+               io_context.run();
+          } );
+
+          std::jthread inputThread( [client]() {
                std::string msg;
                while ( std::getline( std::cin, msg ) )
                {
+                    if ( !client->IsConnected() )
+                    {
+                         std::println( stderr, "Connection lost. Exiting input thread" );
+                         return;
+                    }
                     client->Write( msg );
                }
           } );
-
-          clientThread.join();
-          client->IsConnected() ? inputThread.join() : client->Close(), inputThread.detach();
      }
      catch ( std::exception& e )
      {
-          std::cerr << "Exception: " << e.what() << std::endl;
+          std::println( stderr, "Exception: {}\nStack trace:\n{}", e.what(), std::stacktrace::current() );
+#ifdef __cpp_lib_stacktrace
+          std::println( stderr, "Stack trace:\n{}", std::stacktrace::current() );
+#endif
+          return EXIT_FAILURE;
      }
 
      return EXIT_SUCCESS;

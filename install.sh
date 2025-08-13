@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DEPENDENCIES_LIST=("cmake" "libboost-system-dev" "pkg-config" "libpqxx-dev")
+DEPENDENCIES_LIST=("g++" "cmake" "libboost-system-dev" "postgresql" "postgresql-contrib" "pkg-config" "libpqxx-dev")
 
 display_help() {
   echo "Usage: $0 [option...] {build|clear|help}" >&2
@@ -15,8 +15,10 @@ pkg_check() {
   local pkg_name="$1"
 
   if ! dpkg -s "${pkg_name}" &> /dev/null; then
-    echo "${pkg_name} is not installed. Installing..."
+    echo "\"${pkg_name}\" is not installed. Installing..."
     sudo apt install "${pkg_name}" -y
+  else
+    echo "\"${pkg_name}\" is already installed."
   fi
 }
 

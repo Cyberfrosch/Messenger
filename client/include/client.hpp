@@ -1,17 +1,16 @@
 #pragma once
 
-#ifndef CLIENT_HPP
-#define CLIENT_HPP
-
-#include <boost/asio.hpp>
-
 #include <deque>
 #include <iostream>
 #include <memory>
 #include <string>
 #include <thread>
+#include <string_view>
 
 #include "common.hpp"
+
+#include <boost/asio.hpp>
+
 namespace client
 {
 
@@ -32,14 +31,14 @@ public:
 
      /// @brief Отправляет сообщение серверу
      /// @param msg Сообщение для отправки
-     void Write( const std::string& msg );
+     void Write( std::string_view msg );
 
      /// @brief Закрытие сокета клиента
      void Close();
 
      /// @brief Проверка состояния соединения
      /// @return true, если сокет открыт, иначе false
-     bool IsConnected() const;
+     bool IsConnected() const { return socket_.is_open(); }
 
 private:
      void Read();
@@ -48,9 +47,7 @@ private:
      boost::asio::io_context& io_context_;
      tcp::socket socket_;
      std::string readMessages_;
-     message_queue writeMessages_;
+     common::message_queue writeMessages_;
 };
 
 } // namespace client
-
-#endif // _CLIENT_HPP_
